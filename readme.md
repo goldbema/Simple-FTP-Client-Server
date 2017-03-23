@@ -25,12 +25,6 @@ In the ``ftserver`` working directory, execute ``ftserver`` by typing:
 * ``port`` is an integer from 1 to 65535 inclusive representing the server listening port.
 * ``ftserver`` will exit with an error message if an invalid port number is specifed.
 
-On successful execution, chatserver will give the following message:
-
-`Server open on <PORT>
-----------------------
-Waiting on inbound connection...`
-
 ## Client Execution
 
 ### Execution of directory listing in `ftclient`
