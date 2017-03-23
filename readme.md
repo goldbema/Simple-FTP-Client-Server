@@ -1,4 +1,4 @@
-# Simple ftp client and server
+# Simple ftp Client and Server
 
 These programs provide client-server ftp services, including:
 
