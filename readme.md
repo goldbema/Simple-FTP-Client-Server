@@ -58,3 +58,5 @@ If an error occurred in validation, an error message will be displayed without d
 
 * ``ftserver`` can be exited by pressing ``Ctrl-C`` in the server terminal window.
 * The ``ftserver`` executable can be removed by typing `make clean` in the server terminal window. 
+
+© Maxwell Goldberg 2017
