@@ -1,0 +1,148 @@
+#!/usr/bin/python
+
+"""
+     Filename: ftclient
+       Author: Maxwell Goldberg
+Last Modified: 03.11.17
+Description: The main ftclient function.
+"""
+
+import re
+import select
+import socket
+import sys
+
+from ClientSocket import ClientSocket
+from UserCommand import UserCommand
+
+import filemgmt
+
+TIMEOUT = 3
+
+#        Method: processError()
+#   Description: Closes the control and data sockets and prints the error msg.
+#                Exits with an error.
+#    Parameters: ctrlSock - The control socket descriptor.
+#                dataSock - The data socket descriptor.
+#                err - The error message.
+# Preconditions: All variables are correctly specified.
+#       Returns: None.
+
+def processError(ctrlSock, dataSock, err):
+	ctrlSock.close()
+	dataSock.close()
+	print('ftclient: {0}'.format(err))
+	exit(1)
+
+#        Method: main()
+#   Description: The main ftclient function.
+#    Parameters: None.
+# Preconditions: None.
+#       Returns: None.
+
+def main():
+	# Obtain and validate the user command from the command line.
+	command = UserCommand()
+	command.validate()
+	# Initialize the control socket.
+	cs = ClientSocket()
+	# Initialize the data socket and set it for immediate reuse.
+	ds = ClientSocket()
+	ds.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+ 	# Bind the data socket, and listen. Attempt to connect the
+	# control socket to the server.
+	try:
+		ds.sock.bind(('', command.dPort))
+		ds.sock.listen(1)
+		cs.connect(command.sHost, command.sPort)
+	except socket.error as e:
+		processError(cs.sock, ds.sock, e)
+
+	# Pack the user command into a byte array.
+        packed = command.pack()
+
+	# Send the user command.
+	try:
+		cs.send(packed)
+	except RuntimeError as e:
+		processError(cs.sock, ds.sock, e)
+	
+	# Use select() to determine which socket to read from.
+	inputs = [cs.sock, ds.sock]
+	try:
+		readable, writable, exceptional = select.select(
+					inputs, [], inputs, TIMEOUT)
+	except select.error as e:
+		processError(cs.sock, ds.sock, e)
+
+	# Process readable sockets.
+	for s in readable:
+		# If a list command was issued and the data socket responds,
+		# we are receiving a directory structure.
+		if s is ds.sock and command.mode == 'l':	
+			newSock, addr = ds.sock.accept()
+			print("Receiving directory structure from {0}:{1}".format(socket.getnameinfo((command.sHost, command.dPort), 0)[0], command.dPort))
+			print("-" * 20)
+			newSock = ClientSocket(newSock)
+			# Receive the directory and output it
+			try:	
+				sys.stdout.write(newSock.receive())
+				sys.stdout.flush()
+			except RuntimeError as e:
+				s.close()
+				newSock.sock.close()
+				print('ftclient: {0}'.format(e))
+				exit(1)
+			newSock.sock.close()
+		# If a get command was issued and the data socket responds,
+		# we are receiving a file.
+		elif s is ds.sock and command.mode == 'g':
+			newSock, addr = ds.sock.accept()
+			print('Receiving "{0}" from {1}:{2}'.format(command.fName,
+			socket.getnameinfo((command.sHost, command.dPort), 0)[0], 
+			command.dPort))
+			newSock = ClientSocket(newSock)
+			# Receive the file.
+			try:
+				dataStr = newSock.receive()
+			except RuntimeError as e:
+				s.close()
+				newSock.sock.close()
+				print('ftclient: {0}'.format(e))
+				exit(1)
+			# Write the received string to file.
+                       	filemgmt.strToFile(command.fName, dataStr)
+			newSock.sock.close()
+		# Otherwise, an error is being received on the control
+		# connection. 
+		else:
+			# Receive the error message.
+			try:
+				errMsg = cs.receive()
+			except RuntimeError as e:
+				s.close()
+				print('ftclient: {0}'.format(e))
+				exit(1)
+			# Output the error message.
+			print("{0}:{1} says {2}".format( 
+			socket.getnameinfo((command.sHost, command.sPort), 0)[0], 
+			command.sPort, errMsg))
+	# If an error occurred, remove the offending socket from the inputs and 
+	# attempt to close it. Removing from the inputs is done only in case the
+	# program is extended to a looping version in the future.	
+	for s in exceptional:
+		inputs.remove(s)
+		s.close()
+
+	# If none of the lists has any entries, a timeout occurred.
+        if not readable and not writable and not exceptional:
+		print("ftclient: timeout occurred.")
+	
+	# Attempt to close the control and data sockets.	
+	cs.sock.close()
+	ds.sock.close()
+	
+
+if __name__ == '__main__':
+	main()
