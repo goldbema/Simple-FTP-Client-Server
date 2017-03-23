@@ -1,6 +1,6 @@
-# Simple ftp Client and Server
+# Simple FTP Client and Server
 
-These programs provide client-server ftp services, including:
+These programs provide client-server FTP services, including:
 
 * Server directory listing using the `-l` command.
 * Upload of files from the server working directory to the client working directory using the `-g` command.
